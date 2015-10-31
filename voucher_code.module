@@ -1,0 +1,271 @@
+<?php
+
+/**
+ * @file
+ * Implementaion for hooks and functions for voucher code.
+ */
+
+ /**
+  * Implements hook_permission().
+  */
+ function voucher_code_permission() {
+   return array(
+     'administer voucher code' => array(
+       'title' => t('administer voucher code'),
+       'description' => t('Manage voucher code'),
+     ),
+   );
+ }
+
+ /**
+  * Implements hook_menu().
+  */
+ function voucher_code_menu() {
+  $items = array();
+
+  $items['admin/config/people/voucher_code'] = array(
+   'title' => 'Voucher codes',
+   'description' => 'Manage voucher codes.',
+   'file' => 'voucher_code.admin.inc',
+   'page callback' => 'voucher_code_admin_list',
+   'access arguments' => array('administer voucher code'),
+ );
+
+  $items['admin/config/people/voucher_code/list'] = array(
+    'title' => 'List',
+    'description' => 'List of registration codes',
+    'type' => MENU_DEFAULT_LOCAL_TASK,
+    'weight' => 10,
+  );
+
+  $items['admin/config/people/voucher_code/create'] = array(
+    'title' => 'Create',
+    'description' => 'Create',
+    'type' => MENU_LOCAL_TASK | MENU_LOCAL_ACTION,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('voucher_code_admin_create'),
+    'access arguments' => array('administer voucher code'),
+    'file' => 'voucher_code.admin.inc',
+    'weight' => 20,
+  );
+
+  $items['admin/config/people/voucher_code/edit/%'] = array(
+    'title' => 'Edit',
+    'description' => 'Edit',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('voucher_code_admin_create', 5),
+    'access arguments' => array('administer voucher code'),
+    'file' => 'voucher_code.admin.inc',
+  );
+
+  $items['admin/config/people/voucher_code/delete/%'] = array(
+    'title' => 'Delete',
+    'description' => 'Delete',
+    'type' => MENU_CALLBACK,
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('voucher_code_admin_delete', 5),
+    'access arguments' => array('administer voucher code'),
+    'file' => 'voucher_code.admin.inc',
+  );
+
+  return $items;
+}
+
+function voucher_code_get_by_code($code) {
+  $query = db_select('voucher_code', 'vc')
+    ->fields('vc')
+    ->condition('vc.code', $code);
+
+  $result = $query->execute();
+
+  return $result->fetch();
+}
+
+function voucher_code_set_code_used($code) {
+  db_update('voucher_code')
+    ->expression('used_count', 'used_count + 1')
+    ->condition('code', $code)
+    ->execute();
+}
+
+function voucher_code_validate_code($code) {
+  $voucher = voucher_code_get_by_code($code);
+
+  // If voucher code is not found.
+  if (!$voucher) {
+      return FALSE;
+  }
+
+  // If voucher code is not active.
+  if (!$voucher->is_active) {
+    return FALSE;
+  }
+
+  // If voucher code not in specified date range.
+  if (($voucher->active_from && ($voucher->active_from > REQUEST_TIME)) ||
+      ($voucher->active_to && ($voucher->active_to < REQUEST_TIME))) {
+    return FALSE;
+  }
+
+  // If voucher code exceeds used limit.
+  if ($voucher->limit_count && $voucher->used_count && ($voucher->limit_count >= $voucher->used_count)) {
+    return FALSE;
+  }
+
+  return TRUE;;
+}
+
+/**
+ * Implements hook_field_info().
+ */
+function voucher_code_field_info() {
+ return array(
+   'voucher_code' => array(
+     'label' => t('Voucher Code'),
+     'description' => t('This field allowed to use and validate voucher codes'),
+     'default_widget' => 'voucher_code_field',
+     'default_formatter' => 'voucher_code_default',
+   ),
+ );
+}
+
+/**
+ * Implements hook_field_widget_info().
+ */
+function voucher_code_field_widget_info() {
+ return array(
+   'voucher_code_field' => array(
+     'label' => t('Voucher Code field'),
+     'field types' => array('voucher_code'),
+   ),
+ );
+}
+
+/**
+ * Implements hook_field_settings_form().
+ */
+// @TODO: Remove this if not required.
+function voucher_code_field_settings_form($field, $instance, $has_data) {
+ $settings = $field['settings'];
+
+ $form = array();
+ return $form;
+}
+
+/**
+* Implements hook_field_instance_settings_form().
+*/
+// @TODO: Remove this if not required.
+function voucher_code_field_instance_settings_form($field, $instance) {
+  $settings = $instance['settings'];
+  // Add your instance settings fields here.
+  $form = array();
+  return $form;
+}
+
+/**
+ * Implements hook_field_widget_form().
+ */
+ function voucher_code_field_widget_form(&$form, &$form_state, $field, $instance, $langcode, $items, $delta, $element) {
+   if ($instance['widget']['type'] === 'voucher_code_field') {
+      $element['voucher_code'] = array(
+        '#type' => 'textfield',
+        '#title' => $instance['label'],
+        '#default_value' => isset($items[$delta]['voucher_code']) ? $items[$delta]['voucher_code'] : '',
+        '#required' => $element['#required'],
+        '#size' => 64,
+        '#attributes' => array('maxlength' => 64),
+      );
+  }
+
+  return $element;
+}
+
+/**
+ * Implements hook_field_access().
+ */
+function voucher_code_field_access($op, $field, $entity_type, $entity, $account) {
+  // Hide voucher field on edit mode.
+  if ($field['type'] == 'voucher_code' && $op == 'edit') {
+      //return FALSE;
+  }
+
+  return TRUE;
+}
+
+/**
+ * Implements hook_field_presave().
+ */
+ // @TODO: Remove this if not required.
+function voucher_code_field_presave($entity_type, $entity, $field, $instance, $langcode, &$items) {
+  if (empty($items)) {
+    return;
+  }
+
+  foreach ($items as $delta => $item) {
+    if (isset($item['voucher_code']) && $item['voucher_code'] != '') {
+      voucher_code_set_code_used($item['voucher_code']);
+    }
+  }
+}
+
+/**
+ * Implements hook_field_is_empty().
+ */
+function voucher_code_field_is_empty($item, $field) {
+  if (empty($item['voucher_code']) || !trim($item['voucher_code'])) {
+    return TRUE;
+  }
+
+  return FALSE;
+}
+
+/**
+ * Implements hook_field_validate().
+ */
+function voucher_code_field_validate($entity_type, $entity, $field, $instance, $langcode, $items, &$errors) {
+  // Loop through field items in the case of multiple values.
+  foreach ($items as $delta => $item) {
+    if (isset($item['voucher_code']) && $item['voucher_code'] != '') {
+        if (!voucher_code_validate_code($item['voucher_code'])) {
+          $errors[$field['field_name']][$langcode][$delta][] = array(
+            'error' => 'invalid_voucher_code',
+            'message' => t('Invalid voucher code'),
+          );
+        }
+    }
+  }
+}
+
+/**
+ * Implements hook_field_formatter_info().
+ */
+function voucher_code_field_formatter_info() {
+  return array(
+    'voucher_code_default' => array(
+      'label' => t('Default'),
+      'field types' => array('voucher_code'),
+    ),
+  );
+}
+
+/**
+ * Implements hook_field_formatter_view().
+ */
+ // @TODO: Remove this if not required.
+function voucher_code_field_formatter_view($entity_type, $entity, $field, $instance, $langcode, $items, $display) {
+  $element = array();
+
+  switch ($display['type']) {
+    case 'voucher_code_default' :
+      foreach ($items as $delta => $item) {
+        if (isset($item['voucher_code'])) {
+          $element[$delta]['#markup'] = $item['voucher_code'];
+        }
+      }
+      break;
+  }
+
+  return $element;
+}

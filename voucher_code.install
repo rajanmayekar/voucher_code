@@ -1,0 +1,91 @@
+<?php
+
+/**
+ * @file
+ * Implementaion schema for voucher field, voucher code table.
+ */
+
+/**
+ * Implements hook_field_schema().
+ */
+function voucher_code_field_schema($field) {
+  return array(
+    'columns' => array(
+      'voucher_code' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+      ),
+    ),
+  );
+}
+
+/**
+ * Implements hook_schema().
+ */
+function voucher_code_schema() {
+  $schema = array();
+
+  $schema['voucher_code'] = array(
+    'description' => 'Keep track for created voucher codes.',
+    'fields' => array(
+      'code_id' => array(
+        'type' => 'serial',
+        'unsigned' => TRUE,
+        'not null' => TRUE,
+      ),
+      'code' => array(
+        'type' => 'varchar',
+        'length' => 128,
+        'not null' => TRUE,
+        'description' => 'Unique voucher code.',
+      ),
+      'active_from' => array(
+        'description' => 'The Unix timestamp, active from date.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'active_to' => array(
+        'description' => 'The Unix timestamp, active to date.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'limit_count' => array(
+        'description' => 'Number of times we can use this code.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'used_count' => array(
+        'description' => 'Number of times we can use this code.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'updated' => array(
+        'description' => 'The Unix timestamp, last updated date.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+      'is_active' => array(
+        'description' => 'Boolean indicating if it active or not.',
+        'type' => 'int',
+        'size' => 'tiny',
+        'not null' => TRUE,
+        'default' => 0,
+      ),
+    ),
+    'primary key' => array('code_id'),
+    'indexes' => array(
+      'voucher_code_index_code' => array('code'),
+    ),
+    'unique keys' => array(
+      'voucher_code_uk_code' => array('code'),
+    ),
+  );
+
+  return $schema;
+}

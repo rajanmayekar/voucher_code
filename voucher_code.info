@@ -1,0 +1,6 @@
+name = Voucher Code
+description = Create voucher codes and use it for voucher field
+package = Voucher
+core = 7.x
+
+dependencies[] = field
